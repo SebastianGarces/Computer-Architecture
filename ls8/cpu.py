@@ -8,6 +8,10 @@ PRN = 0b01000111
 MUL = 0b10100010
 PUSH = 0b01000101
 POP = 0b01000110
+CALL = 0b01010000
+RET = 0b00010001
+ADD = 0b10100000
+
 
 class CPU:
     """Main CPU class."""
@@ -60,6 +64,11 @@ class CPU:
         if op == MUL:
             self.reg[reg_a] *= self.reg[reg_b]
             self.pc += 3
+
+        elif op == ADD:
+            self.reg[reg_a] += self.reg[reg_b]
+            self.pc += 3
+
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -90,6 +99,12 @@ class CPU:
         while not halted:
             instruction = self.ram_read(self.pc)
 
+            # print('HALTED: ', halted)
+            # print('INSTRUCTION: ', self.ram_read(self.pc))
+            # print('PC: ', self.pc)
+            # print('REGISTERS: ', self.reg)
+            # print('RAM: ',self.ram)
+
             if instruction == HLT:
                 halted = True
 
@@ -110,15 +125,31 @@ class CPU:
                 operand_b = self.ram_read(self.pc + 2)
                 self.alu(instruction, operand_a, operand_b)
 
+            elif instruction == ADD:
+                operand_a = self.ram_read(self.pc + 1)
+                operand_b = self.ram_read(self.pc + 2)
+                self.alu(instruction, operand_a, operand_b)
+
             elif instruction == POP:
                 operand = self.ram_read(self.pc + 1)
-                self.pop(operand)
+                self.reg[operand] = self.pop()
                 self.pc += 2
 
             elif instruction == PUSH:
                 operand = self.ram_read(self.pc + 1)
                 self.push(operand)
                 self.pc += 2
+
+            elif instruction == CALL:
+                self.sub_sp()
+                next_instruction_address = self.pc + 2
+                self.ram[self.get_sp()] = next_instruction_address
+
+                operand_a = self.ram_read(self.pc + 1)
+                self.pc = self.reg[operand_a]
+
+            elif instruction == RET:
+                self.pc = self.pop()
 
     def ram_read(self, address):
         return self.ram[address]
@@ -135,10 +166,13 @@ class CPU:
     def get_sp(self):
         return self.reg[7]
 
-    def pop(self, operand):
-        self.reg[operand] = self.ram[self.get_sp()]
+    def pop(self):
+        top_of_stack = self.ram[self.get_sp()]
         self.add_sp()
+        return top_of_stack
 
     def push(self, operand):
         self.sub_sp()
         self.ram[self.get_sp()] = self.reg[operand]
+
+
